@@ -1,0 +1,24 @@
+# SSH / secrets
+*.pem
+*.key
+.env
+.env.*
+
+# Ansible
+*.retry
+
+# Backups
+*.bak
+*~
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# IDE / sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

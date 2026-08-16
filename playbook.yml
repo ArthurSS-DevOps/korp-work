@@ -1,0 +1,298 @@
+---
+- name: Provisionar Projeto Korp - Parte 1
+  hosts: servers
+  become: true
+
+  tasks:
+
+    # ==========================================
+    # Docker
+    # ==========================================
+
+    - name: Atualizar cache do APT
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Instalar dependencias do Docker
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - git
+          - gnupg
+        state: present
+
+    - name: Criar diretorio das chaves APT
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Adicionar chave GPG do Docker
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+        force: true
+
+    - name: Adicionar repositorio oficial do Docker
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian trixie stable"
+        filename: docker
+        state: present
+        update_cache: true
+
+    - name: Instalar Docker
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    - name: Garantir que Docker esta iniciado
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Adicionar usuario admin ao grupo Docker
+      ansible.builtin.user:
+        name: admin
+        groups: docker
+        append: true
+
+    # ==========================================
+    # Diretorios da aplicacao
+    # ==========================================
+
+    - name: Criar diretorio principal da aplicacao
+      ansible.builtin.file:
+        path: /opt/korp
+        state: directory
+        owner: admin
+        group: docker
+        mode: '0755'
+
+    - name: Criar diretorio da aplicacao Go
+      ansible.builtin.file:
+        path: /opt/korp/app
+        state: directory
+        owner: admin
+        group: docker
+        mode: '0755'
+
+    - name: Criar diretorio do NGINX
+      ansible.builtin.file:
+        path: /opt/korp/nginx
+        state: directory
+        owner: admin
+        group: docker
+        mode: '0755'
+
+    # ==========================================
+    # Diretorios do Grafana
+    # ==========================================
+
+    - name: Criar diretorio de provisioning do Grafana
+      ansible.builtin.file:
+        path: /opt/korp/grafana/provisioning
+        state: directory
+        owner: admin
+        group: docker
+        mode: '0755'
+
+    - name: Criar diretorio de datasources do Grafana
+      ansible.builtin.file:
+        path: /opt/korp/grafana/provisioning/datasources
+        state: directory
+        owner: admin
+        group: docker
+        mode: '0755'
+
+    - name: Criar diretorio de dashboards do Grafana
+      ansible.builtin.file:
+        path: /opt/korp/grafana/provisioning/dashboards
+        state: directory
+        owner: admin
+        group: docker
+        mode: '0755'
+
+    - name: Criar diretorio dos arquivos JSON do Grafana
+      ansible.builtin.file:
+        path: /opt/korp/grafana/dashboards
+        state: directory
+        owner: admin
+        group: docker
+        mode: '0755'
+
+    # ==========================================
+    # Aplicacao Go
+    # ==========================================
+
+    - name: Copiar main.go
+      ansible.builtin.copy:
+        src: app/main.go
+        dest: /opt/korp/app/main.go
+        owner: admin
+        group: docker
+        mode: '0644'
+
+    - name: Copiar go.mod
+      ansible.builtin.copy:
+        src: app/go.mod
+        dest: /opt/korp/app/go.mod
+        owner: admin
+        group: docker
+        mode: '0644'
+
+    - name: Copiar Dockerfile da aplicacao
+      ansible.builtin.copy:
+        src: app/Dockerfile
+        dest: /opt/korp/app/Dockerfile
+        owner: admin
+        group: docker
+        mode: '0644'
+
+    - name: Copiar go.sum
+      ansible.builtin.copy:
+        src: app/go.sum
+        dest: /opt/korp/app/go.sum
+        owner: admin
+        group: docker
+        mode: '0644'
+
+    # ==========================================
+    # NGINX
+    # ==========================================
+
+    - name: Copiar configuracao do NGINX
+      ansible.builtin.copy:
+        src: nginx/http-server-projeto-korp.conf
+        dest: /opt/korp/nginx/http-server-projeto-korp.conf
+        owner: admin
+        group: docker
+        mode: '0644'
+
+    # ==========================================
+    # Prometheus
+    # ==========================================
+
+    - name: Remover possivel diretorio criado no lugar do prometheus.yml
+      ansible.builtin.file:
+        path: /opt/korp/prometheus.yml
+        state: absent
+
+    - name: Copiar configuracao do Prometheus
+      ansible.builtin.copy:
+        src: prometheus.yml
+        dest: /opt/korp/prometheus.yml
+        owner: admin
+        group: docker
+        mode: '0644'
+
+    # ==========================================
+    # Grafana - Datasource
+    # ==========================================
+
+    - name: Copiar datasource do Grafana
+      ansible.builtin.copy:
+        src: grafana/provisioning/datasources/datasources.yml
+        dest: /opt/korp/grafana/provisioning/datasources/datasources.yml
+        owner: admin
+        group: docker
+        mode: '0644'
+
+    # ==========================================
+    # Grafana - Dashboard Provider
+    # ==========================================
+
+    - name: Copiar configuracao dos dashboards do Grafana
+      ansible.builtin.copy:
+        src: grafana/provisioning/dashboards/dashboard.yml
+        dest: /opt/korp/grafana/provisioning/dashboards/dashboard.yml
+        owner: admin
+        group: docker
+        mode: '0644'
+
+    # ==========================================
+    # Grafana - Dashboard JSON
+    # ==========================================
+
+    - name: Copiar dashboard do Projeto Korp
+      ansible.builtin.copy:
+        src: grafana/dashboards/http-server-projeto-korp-dashboard.json
+        dest: /opt/korp/grafana/dashboards/http-server-projeto-korp-dashboard.json
+        owner: admin
+        group: docker
+        mode: '0644'
+
+    # ==========================================
+    # Docker Compose
+    # ==========================================
+
+    - name: Copiar Docker Compose
+      ansible.builtin.copy:
+        src: docker-compose.yml
+        dest: /opt/korp/docker-compose.yml
+        owner: admin
+        group: docker
+        mode: '0644'
+
+    # ==========================================
+    # Garantir arquivos corretos
+    # ==========================================
+
+    - name: Verificar tipo do prometheus.yml
+      ansible.builtin.stat:
+        path: /opt/korp/prometheus.yml
+      register: prometheus_file
+
+    - name: Falhar se prometheus.yml nao for arquivo
+      ansible.builtin.fail:
+        msg: "O caminho /opt/korp/prometheus.yml nao e um arquivo."
+      when: not prometheus_file.stat.isreg
+
+    # ==========================================
+    # Rede Docker
+    # ==========================================
+
+    - name: Criar rede Docker Korp
+      community.docker.docker_network:
+        name: korp-network
+        driver: bridge
+        state: present
+
+    # ==========================================
+    # Build e execucao
+    # ==========================================
+
+    - name: Subir ambiente com Docker Compose
+      community.docker.docker_compose_v2:
+        project_src: /opt/korp
+        state: present
+        build: always
+        recreate: always
+        remove_orphans: true
+
+    # ==========================================
+    # Validacao
+    # ==========================================
+
+    - name: Testar servico Projeto Korp
+      ansible.builtin.uri:
+        url: http://localhost:80/projeto-korp
+        method: GET
+        status_code: 200
+        return_content: true
+      register: korp_response
+      retries: 10
+      delay: 3
+      until: korp_response.status == 200
+
+    - name: Exibir resposta do Projeto Korp
+      ansible.builtin.debug:
+        msg: "{{ korp_response.content }}"
