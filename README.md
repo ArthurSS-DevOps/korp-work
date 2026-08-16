@@ -24,7 +24,7 @@ O fluxo geral é:
                     │         AWS          │
                     │                      │
                     │ VPC                  │
-                    │ Subnet                │
+                    │ Subnet               │
                     │ Security Group       │
                     │ EC2                  │
                     │ Elastic IP           │
@@ -36,9 +36,9 @@ O fluxo geral é:
                     │                      │
                     │ Configuração do host │
                     │ Docker               │
-                    │ Nginx               │
-                    │ Prometheus          │
-                    │ Grafana             │
+                    │ Nginx                │
+                    │ Prometheus           │
+                    │ Grafana              │
                     │ Aplicação            │
                     └──────────┬───────────┘
                                │
@@ -47,9 +47,9 @@ O fluxo geral é:
                     │        Docker        │
                     │                      │
                     │ Go Application       │
-                    │ Nginx               │
-                    │ Prometheus          │
-                    │ Grafana             │
+                    │ Nginx                │
+                    │ Prometheus           │
+                    │ Grafana              │
                     └──────────┬───────────┘
                                │
                                ▼
