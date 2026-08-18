@@ -1,6 +1,6 @@
 # Projeto Korp — Infraestrutura, Observabilidade e Automação
 
-Projeto desenvolvido como solução para o desafio técnico da **Korp**, envolvendo desenvolvimento de uma aplicação HTTP em Go, conteinerização com Docker, proxy reverso com NGINX, monitoramento com Prometheus e Grafana e automação completa da infraestrutura utilizando Ansible.
+Projeto desenvolvido como solução para o desafio técnico da Korp, envolvendo o desenvolvimento de uma aplicação HTTP em Go, conteinerização com Docker, proxy reverso com NGINX, monitoramento com Prometheus e Grafana, com dashboards provisionados automaticamente, além da automação da infraestrutura utilizando Ansible e Terraform.
 
 Como extensão da solução proposta no desafio, também foi implementada uma infraestrutura em **AWS utilizando Terraform**, permitindo provisionar o ambiente de forma declarativa através de Infrastructure as Code (IaC).
 
