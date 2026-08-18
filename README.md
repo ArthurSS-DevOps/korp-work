@@ -1,81 +1,695 @@
-# Projeto Korp — HTTP Service, Docker, Observabilidade e Ansible
+# Projeto Korp — Infraestrutura, Observabilidade e Automação
 
-Implementação do desafio técnico da Korp, envolvendo desenvolvimento de um serviço HTTP em Golang, conteinerização com Docker, proxy reverso com NGINX, monitoramento com Prometheus e Grafana e automação completa do ambiente utilizando Ansible.
+Projeto desenvolvido como solução para o desafio técnico da **Korp**, envolvendo desenvolvimento de uma aplicação HTTP em Go, conteinerização com Docker, proxy reverso com NGINX, monitoramento com Prometheus e Grafana e automação completa da infraestrutura utilizando Ansible.
 
-Como etapa adicional, o projeto também utiliza Terraform para provisionamento da infraestrutura AWS.
+Como extensão da solução proposta no desafio, também foi implementada uma infraestrutura em **AWS utilizando Terraform**, permitindo provisionar o ambiente de forma declarativa através de Infrastructure as Code (IaC).
 
 ---
 
-## 📋 Sobre o desafio
+## 📋 Sumário
 
-O objetivo do desafio é avaliar conhecimentos práticos em:
+* [Sobre o projeto](#-sobre-o-projeto)
+* [Arquitetura](#-arquitetura)
+* [Tecnologias utilizadas](#-tecnologias-utilizadas)
+* [Parte 1 — Serviço HTTP e Docker](#-parte-1--serviço-http-e-docker)
+* [Parte 2 — Monitoramento e Observabilidade](#-parte-2--monitoramento-e-observabilidade)
+* [Parte 3 — Automação com Ansible](#-parte-3--automação-com-ansible)
+* [Extensão — AWS com Terraform](#-extensão--aws-com-terraform)
+* [Estrutura do projeto](#-estrutura-do-projeto)
+* [Funcionamento da aplicação](#-funcionamento-da-aplicação)
+* [Execução local](#-execução-local)
+* [Provisionamento com Ansible](#-provisionamento-com-ansible)
+* [Infraestrutura AWS](#-infraestrutura-aws)
+* [Preservação do Elastic IP](#-preservação-do-elastic-ip)
+* [Validação](#-validação)
+* [Decisões técnicas](#-decisões-técnicas)
+* [Segurança](#-segurança)
+* [Conclusão](#-conclusão)
 
-* Golang
-* Docker
-* Docker Compose
-* Redes
-* Linux
-* NGINX
-* Prometheus
-* Grafana
-* Ansible
-* Automação de infraestrutura
+---
 
-O projeto foi estruturado para que o ambiente possa ser provisionado automaticamente em uma máquina Linux por meio de um único playbook Ansible.
+# 🚀 Sobre o projeto
 
-A implementação segue as três etapas propostas no desafio:
+O objetivo do projeto é construir e automatizar um ambiente completo para execução, exposição, monitoramento e provisionamento de um serviço HTTP.
 
-1. Criação do serviço e arquitetura do ambiente
-2. Monitoramento e observabilidade
-3. Automação com Ansible
+O serviço principal foi desenvolvido em **Golang** e disponibilizado através de containers Docker.
 
-O desafio também solicita que todos os arquivos sejam disponibilizados em um repositório público do GitHub.
+A arquitetura utiliza:
+
+* **Go** para desenvolvimento da aplicação;
+* **Docker** para conteinerização;
+* **Docker Compose** para orquestração dos serviços;
+* **Docker Bridge Network** para comunicação entre containers;
+* **NGINX** como proxy reverso;
+* **Prometheus** para coleta de métricas;
+* **Grafana** para visualização;
+* **Ansible** para automação e provisionamento;
+* **Terraform** para provisionamento da infraestrutura AWS.
+
+A solução foi estruturada para que o ambiente possa ser reconstruído de maneira automatizada, reduzindo a necessidade de configuração manual.
 
 ---
 
 # 🏗️ Arquitetura
 
-A arquitetura final possui os seguintes componentes:
+A arquitetura principal do projeto pode ser representada da seguinte maneira:
 
 ```text
-                         Internet
-                            │
-                            │ HTTP :80
-                            ▼
-                    ┌─────────────────┐
-                    │      NGINX      │
-                    │  Reverse Proxy  │
-                    │      :80        │
-                    └────────┬────────┘
-                             │
-                             │ HTTP :8080
-                             ▼
-                 ┌─────────────────────────┐
-                 │ http-server-projeto-korp│
-                 │        Golang           │
-                 │         :8080           │
-                 └────────────┬────────────┘
-                              │
-                              │ /metrics
-                              ▼
-                    ┌─────────────────┐
-                    │    Prometheus   │
-                    │      :9090      │
-                    └────────┬────────┘
-                             │
-                             │ PromQL
-                             ▼
-                    ┌─────────────────┐
-                    │     Grafana     │
-                    │      :3000      │
-                    └─────────────────┘
+                         ┌─────────────────────┐
+                         │       Cliente       │
+                         │       Browser       │
+                         │        curl         │
+                         └──────────┬──────────┘
+                                    │
+                                    │ HTTP :80
+                                    ▼
+                         ┌─────────────────────┐
+                         │       NGINX         │
+                         │   Reverse Proxy     │
+                         └──────────┬──────────┘
+                                    │
+                                    │ HTTP :8080
+                                    ▼
+                         ┌─────────────────────┐
+                         │ http-server-projeto │
+                         │       -korp         │
+                         │       Go            │
+                         └──────────┬──────────┘
+                                    │
+                                    │ métricas
+                                    ▼
+                         ┌─────────────────────┐
+                         │     Prometheus      │
+                         │       Metrics       │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │      Grafana        │
+                         │     Dashboard       │
+                         └─────────────────────┘
 ```
 
-Todos os containers utilizam uma rede Docker do tipo `bridge`, permitindo a comunicação entre os serviços através da rede interna.
+Os containers são conectados através de uma rede Docker do tipo **bridge**, permitindo que os serviços se comuniquem utilizando seus nomes dentro da rede.
 
-O serviço da aplicação não expõe diretamente a porta 8080 para o host. O acesso externo é realizado através do NGINX, que funciona como proxy reverso.
+---
 
-Essa configuração atende à arquitetura solicitada no desafio.
+# 🛠️ Tecnologias utilizadas
+
+| Tecnologia         | Função                          |
+| ------------------ | ------------------------------- |
+| Go                 | Desenvolvimento do serviço HTTP |
+| Docker             | Conteinerização                 |
+| Docker Compose     | Execução dos containers         |
+| NGINX              | Proxy reverso                   |
+| Prometheus         | Coleta de métricas              |
+| Grafana            | Visualização e dashboard        |
+| Ansible            | Automação do ambiente           |
+| Terraform          | Infrastructure as Code          |
+| AWS EC2            | Servidor da infraestrutura      |
+| AWS VPC            | Rede da infraestrutura          |
+| AWS Security Group | Controle de acesso              |
+| AWS Elastic IP     | Endereço IP público persistente |
+| Linux              | Ambiente de execução            |
+
+---
+
+# 🟦 Parte 1 — Serviço HTTP e Docker
+
+## Aplicação Go
+
+O serviço foi desenvolvido em **Golang** e possui o nome:
+
+```text
+http-server-projeto-korp
+```
+
+A aplicação recebe requisições na porta:
+
+```text
+8080
+```
+
+O endpoint principal é:
+
+```text
+GET /projeto-korp
+```
+
+A resposta possui o seguinte formato:
+
+```json
+{
+  "nome": "Projeto Korp",
+  "horario": "2026-08-16T17:00:00Z"
+}
+```
+
+O horário é obtido dinamicamente em **UTC** a cada requisição.
+
+Isso garante que a aplicação não dependa de um horário fixo configurado previamente.
+
+---
+
+## Dockerfile
+
+A aplicação possui um `Dockerfile` responsável por construir a imagem do serviço.
+
+O processo é dividido conceitualmente em:
+
+```text
+Código Go
+   │
+   ▼
+Docker build
+   │
+   ▼
+Imagem Docker
+   │
+   ▼
+Container
+   │
+   ▼
+http-server-projeto-korp:8080
+```
+
+---
+
+# 🌐 Rede Docker
+
+Foi criada uma rede Docker no modo:
+
+```text
+bridge
+```
+
+A rede permite que os containers se comuniquem internamente.
+
+A aplicação Go não precisa expor sua porta diretamente para o host.
+
+O acesso externo ocorre através do NGINX.
+
+---
+
+# 🔀 NGINX — Proxy Reverso
+
+O NGINX atua como proxy reverso entre o cliente e a aplicação.
+
+Fluxo:
+
+```text
+Cliente
+   │
+   │ :80
+   ▼
+NGINX
+   │
+   │ :8080
+   ▼
+http-server-projeto-korp
+```
+
+A configuração está localizada em:
+
+```text
+nginx/http-server-projeto-korp.conf
+```
+
+O NGINX recebe a requisição externa e encaminha para o serviço Go através da rede Docker.
+
+O objetivo é evitar que a aplicação precise ser diretamente exposta ao host.
+
+---
+
+# 🐳 Docker Compose
+
+O `docker-compose.yml` é responsável por definir e executar os serviços necessários.
+
+Entre eles:
+
+* `http-server-projeto-korp`
+* `nginx`
+* `prometheus`
+* `grafana`
+
+A aplicação Go permanece acessível internamente pela rede Docker, enquanto o NGINX disponibiliza a porta HTTP para acesso externo.
+
+---
+
+# 📊 Parte 2 — Monitoramento e Observabilidade
+
+A segunda etapa adiciona observabilidade ao serviço.
+
+O objetivo é permitir acompanhar o comportamento da aplicação através de métricas.
+
+Foram utilizados:
+
+```text
+http-server-projeto-korp
+        │
+        │ métricas Prometheus
+        ▼
+   Prometheus
+        │
+        ▼
+     Grafana
+```
+
+O desafio determina como métricas obrigatórias:
+
+* disponibilidade do serviço;
+* volume de requisições.
+
+As métricas são disponibilizadas seguindo o padrão utilizado pelo Prometheus.
+
+---
+
+# 📈 Prometheus
+
+O Prometheus é responsável por coletar as métricas disponibilizadas pela aplicação.
+
+Sua configuração está em:
+
+```text
+prometheus.yml
+```
+
+O Prometheus realiza o scraping do serviço e armazena as séries temporais coletadas.
+
+---
+
+# 📊 Grafana
+
+O Grafana é utilizado para visualizar as métricas coletadas pelo Prometheus.
+
+Foram utilizados arquivos de provisionamento para automatizar a configuração do ambiente.
+
+Estrutura:
+
+```text
+files/
+└── grafana/
+    ├── dashboards/
+    │   └── http-server-projeto-korp-dashboard.json
+    │
+    └── provisioning/
+        ├── dashboards/
+        │   └── dashboard.yml
+        │
+        └── datasources/
+            └── datasources.yml
+```
+
+Isso permite que o Grafana seja configurado automaticamente durante a implantação.
+
+Essa abordagem atende inclusive ao bônus proposto no desafio, que menciona o provisionamento automatizado através de arquivos como `datasources.yml`, `dashboards.yml` e o JSON do dashboard.
+
+---
+
+# ⚙️ Parte 3 — Automação com Ansible
+
+A terceira etapa consiste em automatizar o processo de configuração do ambiente.
+
+O arquivo principal é:
+
+```text
+playbook.yml
+```
+
+O Ansible é responsável por automatizar tarefas como:
+
+* instalação/configuração do Docker;
+* criação da rede;
+* preparação da aplicação;
+* build da imagem;
+* configuração do Docker Compose;
+* configuração do NGINX;
+* configuração do Prometheus;
+* configuração do Grafana;
+* execução dos containers;
+* validação do serviço.
+
+O objetivo é evitar que o ambiente dependa de uma sequência manual de comandos.
+
+---
+
+# ▶️ Execução com Ansible
+
+Após configurar o inventário:
+
+```text
+inventory.ini
+```
+
+o ambiente pode ser provisionado através do playbook:
+
+```bash
+ansible-playbook playbook.yml
+```
+
+A proposta do desafio é justamente que todo o ambiente seja provisionado utilizando um único comando Ansible.
+
+---
+
+# ☁️ Extensão — AWS com Terraform
+
+## Por que Terraform?
+
+A utilização da AWS **não fazia parte dos requisitos obrigatórios do desafio**.
+
+A infraestrutura AWS foi adicionada por iniciativa própria como uma extensão do projeto, com o objetivo de demonstrar conhecimentos adicionais de:
+
+* Cloud Computing;
+* Infrastructure as Code;
+* AWS;
+* Terraform;
+* redes;
+* segurança;
+* provisionamento automatizado.
+
+Dessa forma, o projeto não fica limitado a uma execução exclusivamente local.
+
+A infraestrutura foi descrita utilizando Terraform, permitindo que os recursos da AWS sejam definidos como código.
+
+---
+
+# 🏗️ Infraestrutura AWS
+
+A infraestrutura foi organizada utilizando Terraform.
+
+Estrutura:
+
+```text
+terraform/
+├── ansible.tf
+├── ec2.tf
+├── main.tf
+├── network.tf
+├── outputs.tf
+├── provider.tf
+├── security.tf
+├── variables.tf
+├── versions.tf
+├── terraform.tfvars.example
+└── .terraform.lock.hcl
+```
+
+---
+
+## Recursos provisionados
+
+A infraestrutura contempla componentes como:
+
+```text
+AWS
+│
+├── VPC
+│
+├── Subnet
+│
+├── Security Group
+│
+├── EC2
+│
+└── Elastic IP
+```
+
+A EC2 funciona como ambiente Linux para execução da infraestrutura automatizada pelo Ansible.
+
+---
+
+# 🔐 Security Group
+
+O Security Group é utilizado para controlar o acesso à instância.
+
+As regras são definidas através do Terraform.
+
+O objetivo é permitir somente os acessos necessários para operação e administração do ambiente.
+
+O acesso SSH é restrito ao endereço IP autorizado configurado através das variáveis.
+
+---
+
+# 🌍 Elastic IP
+
+Foi utilizado um **Elastic IP** para manter um endereço público estável para a infraestrutura.
+
+Isso é importante porque a aplicação e os serviços podem ser acessados através de um endereço público persistente.
+
+O Elastic IP também foi tratado com atenção durante o processo de alteração da infraestrutura para evitar sua perda durante operações de Terraform.
+
+---
+
+# ♻️ Preservação do Elastic IP durante alterações
+
+Quando é necessário destruir e recriar parte da infraestrutura, o Elastic IP pode ser removido do gerenciamento do Terraform antes do `destroy`.
+
+Exemplo:
+
+```bash
+terraform state rm aws_eip.korp
+```
+
+Depois:
+
+```bash
+terraform destroy
+```
+
+Após a recriação da infraestrutura, o Elastic IP existente pode ser importado novamente:
+
+```bash
+terraform import aws_eip.korp eipalloc-XXXXXXXX
+```
+
+E então:
+
+```bash
+terraform apply
+```
+
+Dessa forma, o recurso existente pode continuar sendo utilizado sem necessariamente criar um novo Elastic IP.
+
+> O ID `eipalloc-XXXXXXXX` deve ser substituído pelo ID real do Elastic IP existente na AWS.
+
+---
+
+# 🔧 Terraform
+
+## Inicialização
+
+Dentro do diretório Terraform:
+
+```bash
+terraform init
+```
+
+## Validação
+
+```bash
+terraform validate
+```
+
+## Planejamento
+
+```bash
+terraform plan
+```
+
+## Aplicação
+
+```bash
+terraform apply
+```
+
+Para confirmar:
+
+```text
+yes
+```
+
+---
+
+# ⚠️ Variáveis e informações sensíveis
+
+O arquivo:
+
+```text
+terraform.tfvars
+```
+
+não deve ser versionado no GitHub.
+
+Por esse motivo, o projeto possui:
+
+```text
+terraform.tfvars.example
+```
+
+Esse arquivo serve como modelo para configuração.
+
+Exemplo:
+
+```hcl
+aws_region = "sa-east-1"
+
+ami_id = "ami-XXXXXXXX"
+
+instance_type = "t3.micro"
+
+key_name = "korpkey"
+
+allowed_ssh_cidr = "SEU_IP/32"
+
+allowed_monitoring_cidr = "SEU_IP/32"
+
+vpc_cidr = "10.0.0.0/16"
+
+subnet_cidr = "10.0.1.0/24"
+
+private_ip = "10.0.1.10"
+
+root_volume_size = 40
+```
+
+Após criar o arquivo real:
+
+```bash
+terraform.tfvars
+```
+
+os valores específicos da infraestrutura devem ser preenchidos localmente.
+
+---
+
+# 🔒 Segurança do repositório
+
+O projeto utiliza `.gitignore` para evitar o versionamento de informações sensíveis e arquivos gerados localmente.
+
+Entre os arquivos ignorados estão:
+
+```text
+*.pem
+*.key
+.env
+*.tfvars
+*.tfstate
+.terraform/
+*.bak
+```
+
+O arquivo de exemplo:
+
+```text
+terraform.tfvars.example
+```
+
+é mantido no repositório para demonstrar quais variáveis precisam ser configuradas.
+
+---
+
+# 🧪 Execução local
+
+Para executar o ambiente localmente:
+
+```bash
+docker compose up -d --build
+```
+
+Verificar os containers:
+
+```bash
+docker ps
+```
+
+Verificar os logs:
+
+```bash
+docker compose logs
+```
+
+---
+
+# 🔎 Teste da aplicação
+
+O teste principal definido pelo desafio é:
+
+```bash
+curl http://localhost:80/projeto-korp
+```
+
+A resposta esperada possui a estrutura:
+
+```json
+{
+  "nome": "Projeto Korp",
+  "horario": "..."
+}
+```
+
+O campo `horario` deve ser atualizado dinamicamente a cada requisição.
+
+O desafio especifica esse teste como validação do funcionamento do ambiente.
+
+---
+
+# 🔍 Verificação dos serviços
+
+Containers:
+
+```bash
+docker ps
+```
+
+Logs da aplicação:
+
+```bash
+docker compose logs http-server-projeto-korp
+```
+
+Logs do NGINX:
+
+```bash
+docker compose logs nginx
+```
+
+Logs do Prometheus:
+
+```bash
+docker compose logs prometheus
+```
+
+Logs do Grafana:
+
+```bash
+docker compose logs grafana
+```
+
+---
+
+# 📊 Acessos
+
+Em execução local, os principais serviços podem ser acessados através das portas configuradas no `docker-compose.yml`.
+
+### Aplicação
+
+```text
+http://localhost/projeto-korp
+```
+
+### Grafana
+
+```text
+http://localhost:3000
+```
+
+### Prometheus
+
+```text
+http://localhost:9090
+```
+
+> Em uma implantação AWS, o acesso externo depende das regras configuradas no Security Group e dos outputs fornecidos pelo Terraform.
 
 ---
 
@@ -90,9 +704,6 @@ korp-work/
 │   ├── go.sum
 │   └── main.go
 │
-├── nginx/
-│   └── http-server-projeto-korp.conf
-│
 ├── files/
 │   └── grafana/
 │       ├── dashboards/
@@ -105,8 +716,10 @@ korp-work/
 │           └── datasources/
 │               └── datasources.yml
 │
+├── nginx/
+│   └── http-server-projeto-korp.conf
+│
 ├── terraform/
-│   ├── .terraform.lock.hcl
 │   ├── ansible.tf
 │   ├── ec2.tf
 │   ├── main.tf
@@ -116,921 +729,190 @@ korp-work/
 │   ├── security.tf
 │   ├── terraform.tfvars.example
 │   ├── variables.tf
-│   └── versions.tf
+│   ├── versions.tf
+│   └── .terraform.lock.hcl
 │
+├── ansible.cfg
 ├── docker-compose.yml
-├── prometheus.yml
 ├── inventory.ini
 ├── playbook.yml
-├── ansible.cfg
+├── prometheus.yml
 └── .gitignore
 ```
 
-Arquivos sensíveis, como `terraform.tfvars`, estados do Terraform, chaves privadas e arquivos `.env`, não devem ser versionados.
-
 ---
 
-# 1. Serviço HTTP em Golang
+# 🧠 Decisões técnicas
 
-O serviço foi desenvolvido em Golang com o nome:
+## Go
 
-```text
-http-server-projeto-korp
-```
+Go foi utilizado para criar o serviço HTTP por ser uma linguagem adequada para aplicações leves, performáticas e facilmente distribuídas através de containers.
 
-A aplicação recebe requisições na porta:
+## Docker
 
-```text
-8080
-```
+Docker fornece isolamento e portabilidade para a aplicação.
 
-E disponibiliza o endpoint:
-
-```text
-GET /projeto-korp
-```
-
-A resposta possui o formato:
-
-```json
-{
-  "nome": "Projeto Korp",
-  "horario": "2026-08-15T02:24:05Z"
-}
-```
-
-O campo `horario` é gerado dinamicamente utilizando o horário atual em UTC a cada requisição.
-
-Essa implementação atende ao requisito de criação do servidor HTTP e do endpoint especificado no desafio.
-
----
-
-# 2. Docker
-
-A aplicação possui um `Dockerfile` responsável pela construção da imagem e execução do serviço dentro de um container.
-
-O objetivo é separar a aplicação do ambiente do host e permitir que ela seja executada de maneira reproduzível.
-
-A aplicação é posteriormente utilizada pelo Docker Compose.
-
----
-
-# 3. Rede Docker
-
-Foi criada uma rede Docker no modo `bridge`.
-
-A rede permite que os containers se comuniquem internamente utilizando a rede Docker, sem necessidade de expor todas as portas diretamente para o host.
-
-A comunicação principal ocorre da seguinte forma:
-
-```text
-NGINX
-  │
-  │ http-server-projeto-korp:8080
-  ▼
-Aplicação Golang
-```
-
-O nome do serviço Docker pode ser utilizado para resolução interna entre containers.
-
----
-
-# 4. Docker Compose
-
-O `docker-compose.yml` reúne os componentes necessários para executar o ambiente.
-
-Os principais serviços são:
-
-* `http-server-projeto-korp`
-* `nginx`
-* `prometheus`
-* `grafana`
-
-## Aplicação
-
-A aplicação Golang:
-
-* utiliza a imagem construída pelo projeto;
-* conecta-se à rede Docker;
-* escuta na porta 8080;
-* não expõe diretamente a porta 8080 para o host.
-
-Isso segue a exigência do desafio de que o serviço não seja diretamente exposto ao host.
+Isso permite executar o mesmo serviço em diferentes ambientes sem depender diretamente das configurações do sistema operacional.
 
 ## NGINX
 
-O NGINX utiliza a imagem oficial e possui a porta:
+O NGINX foi escolhido como proxy reverso para separar o acesso externo da aplicação.
 
-```text
-80:80
-```
+Isso permite que a aplicação permaneça acessível apenas dentro da rede Docker.
 
-O arquivo de configuração é montado através de volume:
+## Prometheus
 
-```text
-nginx/http-server-projeto-korp.conf
-```
+Prometheus foi utilizado por possuir um modelo de coleta adequado para métricas de aplicações e infraestrutura.
 
----
+## Grafana
 
-# 5. Proxy reverso
+Grafana fornece uma camada de visualização para as métricas coletadas pelo Prometheus.
 
-O NGINX funciona como proxy reverso entre o host e a aplicação.
+## Ansible
 
-Fluxo:
+Ansible foi utilizado para automatizar a configuração do ambiente.
 
-```text
-localhost:80
-      │
-      ▼
-    NGINX
-      │
-      ▼
-http-server-projeto-korp:8080
-```
+A principal vantagem é transformar uma configuração que poderia exigir diversos comandos manuais em um processo reproduzível.
 
-O arquivo:
+## Terraform
 
-```text
-nginx/http-server-projeto-korp.conf
-```
+Terraform foi utilizado como extensão do desafio para representar a infraestrutura AWS como código.
 
-configura o encaminhamento das requisições para a aplicação.
-
-Dessa forma, o acesso externo é:
-
-```bash
-curl http://localhost:80/projeto-korp
-```
-
-Resultado esperado:
-
-```json
-{
-  "nome": "Projeto Korp",
-  "horario": "2026-08-15T02:24:05Z"
-}
-```
-
-Esse teste corresponde ao teste de funcionamento especificado no desafio.
+Dessa forma, a infraestrutura de Cloud também pode ser versionada, revisada e reproduzida.
 
 ---
 
-# 6. Monitoramento e Observabilidade
+# 🔄 Fluxo completo de provisionamento
 
-A segunda etapa adiciona monitoramento ao serviço `http-server-projeto-korp`.
+A arquitetura completa pode ser entendida em duas camadas.
 
-As duas métricas obrigatórias são:
-
-* disponibilidade do serviço;
-* volume de requisições.
-
-As métricas são expostas utilizando o padrão do Prometheus, conforme solicitado no desafio.
-
----
-
-## 6.1 Endpoint de métricas
-
-A aplicação expõe métricas no endpoint:
-
-```text
-/metrics
-```
-
-Exemplo:
-
-```bash
-curl http://172.18.0.2:8080/metrics
-```
-
-Entre as métricas disponibilizadas estão:
-
-```text
-http_server_up
-http_server_requests_total
-```
-
-Além das métricas específicas da aplicação, a aplicação Golang também expõe métricas do runtime e do processo.
-
----
-
-# 7. Disponibilidade
-
-A disponibilidade da aplicação é representada pela métrica:
-
-```text
-http_server_up
-```
-
-Valores:
-
-```text
-1 = serviço disponível
-0 = serviço indisponível
-```
-
-Exemplo:
-
-```text
-http_server_up 1
-```
-
-No Grafana, essa métrica é apresentada visualmente como:
-
-```text
-UP
-```
-
-ou:
-
-```text
-DOWN
-```
-
-Isso permite identificar rapidamente se o serviço está disponível.
-
----
-
-# 8. Volume de requisições
-
-O volume de requisições é acompanhado através da métrica:
-
-```text
-http_server_requests_total
-```
-
-Ela registra a quantidade de requisições recebidas pelo serviço.
-
-A métrica possui informações como:
-
-```text
-endpoint
-method
-status
-```
-
-Exemplo:
-
-```text
-http_server_requests_total{
-    endpoint="/projeto-korp",
-    method="GET",
-    status="200"
-}
-```
-
-Também é possível utilizar PromQL para analisar a taxa de requisições ao longo do tempo.
-
-Exemplo:
-
-```promql
-rate(http_server_requests_total[5m])
-```
-
----
-
-# 9. Prometheus
-
-O Prometheus é responsável por coletar as métricas disponibilizadas pela aplicação.
-
-O arquivo:
-
-```text
-prometheus.yml
-```
-
-define a configuração de coleta.
-
-Fluxo:
-
-```text
-http-server-projeto-korp
-          │
-          │ /metrics
-          ▼
-      Prometheus
-```
-
-O Prometheus foi configurado para realizar o scrape do serviço da aplicação.
-
----
-
-# 10. Grafana
-
-O Grafana é utilizado para visualizar as métricas coletadas pelo Prometheus.
-
-O ambiente possui configuração de provisionamento para:
-
-* datasource do Prometheus;
-* dashboard;
-* configuração do dashboard.
-
-Arquivos:
-
-```text
-files/grafana/provisioning/datasources/datasources.yml
-```
-
-```text
-files/grafana/provisioning/dashboards/dashboard.yml
-```
-
-```text
-files/grafana/dashboards/http-server-projeto-korp-dashboard.json
-```
-
-O desafio permite que o dashboard seja criado manualmente, porém a automatização através de arquivos de provisioning é considerada um bônus. Neste projeto, o provisioning foi implementado para tornar a configuração reproduzível.
-
----
-
-# 11. Dashboard
-
-O dashboard do Projeto Korp permite acompanhar o comportamento da aplicação.
-
-Entre as informações apresentadas estão:
-
-### Disponibilidade
-
-```text
-Status da Aplicação
-```
-
-Representação:
-
-```text
-UP
-DOWN
-```
-
-### Volume de requisições
-
-A métrica:
-
-```text
-http_server_requests_total
-```
-
-permite acompanhar a quantidade e a taxa de requisições recebidas.
-
-### CPU
-
-Monitoramento do consumo de CPU do processo.
-
-### Memória
-
-Monitoramento da memória utilizada pela aplicação.
-
-### Goroutines
-
-Quantidade de goroutines utilizadas pelo processo Go.
-
-### Memória do runtime Go
-
-Monitoramento de informações relacionadas ao heap da aplicação.
-
-### Garbage Collection
-
-Monitoramento das informações de Garbage Collection do runtime Go.
-
-### Status dos targets
-
-Monitoramento do estado dos targets acompanhados pelo Prometheus.
-
----
-
-# 12. Automação com Ansible
-
-A terceira etapa do desafio consiste em automatizar todo o ambiente utilizando Ansible.
-
-O arquivo principal é:
-
-```text
-playbook.yml
-```
-
-O playbook foi desenvolvido para realizar o provisionamento do ambiente Linux.
-
-Entre as etapas automatizadas estão:
-
-1. instalação/configuração do Docker;
-2. criação da rede Docker;
-3. preparação da aplicação;
-4. build da imagem;
-5. configuração do NGINX;
-6. configuração do proxy reverso;
-7. configuração do Prometheus;
-8. configuração do Grafana;
-9. execução dos containers;
-10. validação do serviço através de uma requisição HTTP.
-
-Esses pontos correspondem aos requisitos mínimos estabelecidos para o playbook.
-
----
-
-# 13. Provisionamento do ambiente
-
-Depois de configurar o inventário:
-
-```text
-inventory.ini
-```
-
-o ambiente pode ser provisionado através do Ansible.
-
-Exemplo:
-
-```bash
-ansible-playbook -i inventory.ini playbook.yml
-```
-
-A ideia é que o ambiente completo seja configurado através de um único comando Ansible, conforme solicitado no desafio.
-
----
-
-# 14. Validação
-
-Após o provisionamento, o funcionamento do serviço pode ser validado com:
-
-```bash
-curl http://localhost:80/projeto-korp
-```
-
-Resposta esperada:
-
-```json
-{
-  "horario": "2026-08-15T02:24:05Z",
-  "nome": "Projeto Korp"
-}
-```
-
-Também é possível verificar diretamente as métricas:
-
-```bash
-curl http://<IP_DO_CONTAINER>:8080/metrics
-```
-
-Exemplo de métricas específicas:
-
-```text
-http_server_up 1
-
-http_server_requests_total{
-    endpoint="/projeto-korp",
-    method="GET",
-    status="200"
-}
-```
-
----
-
-# 15. Terraform — infraestrutura adicional
-
-Além dos requisitos do desafio, foi utilizado Terraform para provisionar a infraestrutura AWS onde o projeto é executado.
-
-Essa parte não substitui o Ansible.
-
-A separação de responsabilidades é:
+### Infraestrutura
 
 ```text
 Terraform
+    │
+    ▼
+AWS
+    │
+    ├── VPC
+    ├── Subnet
+    ├── Security Group
+    ├── EC2
+    └── Elastic IP
+          │
+          ▼
+        Linux
+```
+
+### Configuração da aplicação
+
+```text
+Ansible
    │
-   ├── Infraestrutura AWS
-   ├── VPC
-   ├── Subnet
-   ├── Security Group
-   ├── EC2
-   └── Elastic IP
+   ├── Docker
+   ├── Docker Network
+   ├── Docker Compose
+   ├── NGINX
+   ├── Prometheus
+   └── Grafana
           │
           ▼
-       Ansible
-          │
-          ├── Docker
-          ├── Containers
-          ├── NGINX
-          ├── Prometheus
-          └── Grafana
+     Aplicação Go
 ```
 
-Dessa forma:
-
-**Terraform = infraestrutura**
-
-**Ansible = configuração e aplicação**
-
----
-
-# 16. Estrutura Terraform
-
-Os principais arquivos são:
+Portanto:
 
 ```text
-terraform/
-├── ansible.tf
-├── ec2.tf
-├── main.tf
-├── network.tf
-├── outputs.tf
-├── provider.tf
-├── security.tf
-├── terraform.tfvars.example
-├── variables.tf
-└── versions.tf
-```
-
-O arquivo:
-
-```text
-terraform.tfvars
-```
-
-contém valores específicos do ambiente e não deve ser enviado para o GitHub.
-
-Foi disponibilizado:
-
-```text
-terraform.tfvars.example
-```
-
-como modelo.
-
----
-
-# 17. Inicializando o Terraform
-
-Entre no diretório:
-
-```bash
-cd terraform
-```
-
-Inicialize o Terraform:
-
-```bash
-terraform init
-```
-
-Valide a configuração:
-
-```bash
-terraform validate
-```
-
-Visualize o plano:
-
-```bash
-terraform plan
-```
-
-Aplique a infraestrutura:
-
-```bash
-terraform apply
+Terraform
+   ↓
+Infraestrutura AWS
+   ↓
+Servidor Linux
+   ↓
+Ansible
+   ↓
+Docker
+   ↓
+┌───────────────────────────────┐
+│ NGINX                         │
+│       ↓                       │
+│ Go Application                │
+│       ↓                       │
+│ Prometheus                    │
+│       ↓                       │
+│ Grafana                       │
+└───────────────────────────────┘
 ```
 
 ---
 
-# 18. Cuidados com o Elastic IP
+# ✅ Requisitos do desafio
 
-O projeto utiliza Elastic IP.
-
-Antes de executar um `terraform destroy`, é importante considerar o estado desse recurso.
-
-Caso o Elastic IP precise ser preservado, ele pode ser removido do state antes do destroy:
-
-```bash
-terraform state rm aws_eip.korp
-```
-
-Depois:
-
-```bash
-terraform destroy
-```
-
-Após recriar a infraestrutura:
-
-```bash
-terraform import aws_eip.korp eipalloc-XXXXXXXX
-```
-
-E então:
-
-```bash
-terraform apply
-```
-
-O `eipalloc-XXXXXXXX` deve ser substituído pelo ID real do Elastic IP.
-
-**Importante:** o procedimento acima deve ser utilizado somente quando o Elastic IP realmente precisa ser preservado. O state do Terraform e os recursos AWS devem ser tratados com cuidado para evitar alterações ou exclusões acidentais.
+| Requisito                          | Implementação      |
+| ---------------------------------- | ------------------ |
+| Serviço HTTP em Go                 | ✅                  |
+| Serviço `http-server-projeto-korp` | ✅                  |
+| Porta 8080                         | ✅                  |
+| Endpoint `/projeto-korp`           | ✅                  |
+| Horário UTC dinâmico               | ✅                  |
+| Dockerfile                         | ✅                  |
+| Docker                             | ✅                  |
+| Rede Docker bridge                 | ✅                  |
+| Docker Compose                     | ✅                  |
+| NGINX                              | ✅                  |
+| Proxy reverso                      | ✅                  |
+| Prometheus                         | ✅                  |
+| Métrica de disponibilidade         | ✅                  |
+| Volume de requisições              | ✅                  |
+| Grafana                            | ✅                  |
+| Dashboard                          | ✅                  |
+| Provisionamento Grafana            | ✅                  |
+| Ansible                            | ✅                  |
+| Validação HTTP                     | ✅                  |
+| Provisionamento automatizado       | ✅                  |
+| Repositório GitHub                 | ✅                  |
+| Terraform/AWS                      | ⭐ Extensão própria |
 
 ---
 
-# 19. Segurança
+# 🎯 Resultado
 
-Arquivos contendo informações específicas do ambiente não devem ser enviados para o repositório.
-
-O `.gitignore` impede o versionamento de arquivos como:
+O projeto implementa o fluxo completo solicitado no desafio:
 
 ```text
-*.pem
-*.key
-.env
-*.tfvars
-*.tfstate
-*.tfstate.*
+Desenvolvimento
+      ↓
+Containerização
+      ↓
+Rede Docker
+      ↓
+Proxy Reverso
+      ↓
+Monitoramento
+      ↓
+Dashboard
+      ↓
+Automação
+      ↓
+Infrastructure as Code
+      ↓
+Cloud AWS
 ```
 
-O projeto disponibiliza apenas o exemplo:
-
-```text
-terraform.tfvars.example
-```
-
-Isso permite que outra pessoa configure seus próprios valores sem expor informações do ambiente original.
+Além dos requisitos originais, a infraestrutura foi estendida com Terraform e AWS para demonstrar uma abordagem mais próxima de um ambiente real de infraestrutura e DevOps.
 
 ---
 
-# 20. Execução completa
+# 👨‍💻 Autor
 
-A sequência geral para reproduzir o projeto é:
+**ArthurSS-DevOps**
 
-```text
-1. Provisionar infraestrutura
-          │
-          ▼
-      Terraform
-          │
-          ▼
-2. Criar máquina Linux
-          │
-          ▼
-3. Executar Ansible
-          │
-          ▼
-4. Instalar/configurar Docker
-          │
-          ▼
-5. Criar rede Docker
-          │
-          ▼
-6. Build da aplicação
-          │
-          ▼
-7. Subir Docker Compose
-          │
-          ├──────────────┐
-          ▼              ▼
-        NGINX        Aplicação Go
-          │              │
-          │              └── /metrics
-          │                    │
-          ▼                    ▼
-       HTTP :80          Prometheus
-                              │
-                              ▼
-                           Grafana
-```
+Projeto desenvolvido para avaliação técnica da Korp.
 
 ---
 
-# 21. Testes principais
+# 📌 Observação
 
-## Teste da aplicação através do NGINX
+A infraestrutura AWS e o uso de Terraform foram implementados como **extensão voluntária do desafio**, não substituindo os requisitos originais de Docker, programação, redes, servidores, monitoramento e Ansible.
 
-```bash
-curl -i http://localhost:80/projeto-korp
-```
-
-Esperado:
-
-```text
-HTTP/1.1 200 OK
-```
-
-e o JSON da aplicação.
-
----
-
-## Teste da porta 8080
-
-A porta 8080 não deve estar diretamente exposta ao host.
-
-Por isso:
-
-```bash
-curl http://localhost:8080/projeto-korp
-```
-
-pode falhar.
-
-Isso é esperado, pois o acesso externo deve ocorrer através do NGINX:
-
-```text
-localhost:80
-     │
-     ▼
-   NGINX
-     │
-     ▼
-app:8080
-```
-
----
-
-## Teste das métricas
-
-```bash
-curl http://<IP_INTERNO_DA_APLICACAO>:8080/metrics
-```
-
-Verificar principalmente:
-
-```text
-http_server_up
-```
-
-e:
-
-```text
-http_server_requests_total
-```
-
----
-
-## Teste do Docker
-
-```bash
-docker ps
-```
-
-Verificar se os containers estão em execução.
-
-Também pode ser utilizado:
-
-```bash
-docker network ls
-```
-
-para verificar a rede Docker.
-
----
-
-# 22. Tecnologias utilizadas
-
-| Tecnologia     | Função                                |
-| -------------- | ------------------------------------- |
-| Go             | Desenvolvimento do serviço HTTP       |
-| Docker         | Conteinerização                       |
-| Docker Compose | Orquestração dos containers           |
-| NGINX          | Proxy reverso                         |
-| Prometheus     | Coleta de métricas                    |
-| Grafana        | Visualização das métricas             |
-| Ansible        | Automação e provisionamento           |
-| Terraform      | Provisionamento da infraestrutura AWS |
-| AWS EC2        | Servidor Linux                        |
-| AWS VPC        | Rede da infraestrutura                |
-| Git/GitHub     | Versionamento do projeto              |
-
----
-
-# 23. Resultado final
-
-O projeto final permite:
-
-* executar uma aplicação HTTP em Golang;
-* executar a aplicação dentro de um container;
-* utilizar uma rede Docker para comunicação entre serviços;
-* utilizar NGINX como proxy reverso;
-* acessar a aplicação através da porta 80;
-* expor métricas no padrão Prometheus;
-* monitorar a disponibilidade da aplicação;
-* monitorar o volume de requisições;
-* coletar métricas com Prometheus;
-* visualizar métricas através do Grafana;
-* utilizar dashboard para análise do comportamento da aplicação;
-* provisionar o ambiente automaticamente com Ansible;
-* provisionar a infraestrutura AWS com Terraform.
-
-A implementação atende aos requisitos técnicos principais do desafio e também inclui automação do Grafana através de provisioning, além do provisionamento adicional da infraestrutura com Terraform.
-
----
-
-# 24. Demonstração
-
-Durante a demonstração do projeto, a sequência recomendada é:
-
-### 1. Mostrar o código da aplicação
-
-```text
-app/main.go
-```
-
-Explicar:
-
-* servidor HTTP;
-* porta 8080;
-* endpoint `/projeto-korp`;
-* horário UTC;
-* métricas Prometheus.
-
-### 2. Mostrar o Dockerfile
-
-```text
-app/Dockerfile
-```
-
-Explicar a construção e execução da aplicação em container.
-
-### 3. Mostrar o Docker Compose
-
-```text
-docker-compose.yml
-```
-
-Explicar:
-
-* rede;
-* aplicação;
-* NGINX;
-* Prometheus;
-* Grafana;
-* volumes;
-* portas.
-
-### 4. Mostrar o proxy reverso
-
-```text
-nginx/http-server-projeto-korp.conf
-```
-
-Explicar o fluxo:
-
-```text
-HTTP :80 → NGINX → aplicação :8080
-```
-
-### 5. Testar a aplicação
-
-```bash
-curl http://localhost:80/projeto-korp
-```
-
-### 6. Mostrar as métricas
-
-```bash
-curl http://<IP>:8080/metrics
-```
-
-Mostrar principalmente:
-
-```text
-http_server_up
-http_server_requests_total
-```
-
-### 7. Mostrar o Prometheus
-
-Demonstrar que o target está sendo coletado.
-
-### 8. Mostrar o Grafana
-
-Apresentar o dashboard e destacar:
-
-```text
-Disponibilidade do serviço
-Volume de requisições
-```
-
-Além das métricas adicionais.
-
-### 9. Demonstrar o Ansible
-
-Executar:
-
-```bash
-ansible-playbook -i inventory.ini playbook.yml
-```
-
-Mostrar a execução e a validação final realizada pelo playbook.
-
-### 10. Mostrar o Terraform
-
-Apresentar a infraestrutura AWS e explicar a separação:
-
-```text
-Terraform → infraestrutura
-Ansible   → configuração da máquina e aplicação
-```
-
----
-
-# 25. Considerações finais
-
-O projeto foi desenvolvido com foco em automação, reprodutibilidade e observabilidade.
-
-A aplicação é executada de forma isolada em container, o NGINX controla o acesso externo, o Prometheus coleta as métricas e o Grafana fornece a visualização.
-
-O Ansible automatiza a configuração do ambiente e o Terraform permite reproduzir a infraestrutura AWS.
-
-O resultado é uma arquitetura simples, reproduzível e alinhada aos requisitos apresentados no desafio técnico da Korp.
+O objetivo da extensão foi demonstrar conhecimentos adicionais de **Cloud, Infrastructure as Code, Terraform e AWS**, mantendo a solução principal alinhada ao escopo solicitado pela Korp.
